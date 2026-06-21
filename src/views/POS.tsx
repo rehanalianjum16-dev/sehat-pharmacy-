@@ -4,8 +4,8 @@ import type { Medicine, Customer, SaleItem, Sale } from '../types/db';
 import { Search, Plus, Minus, Trash2, ShoppingCart, UserPlus, Receipt, CreditCard, Wallet, Banknote, DollarSign, MapPin } from 'lucide-react';
 
 export const POS: React.FC = () => {
-  const { 
-    medicines, customers, categories, currentUser, settings, checkoutSale, updateCustomers 
+  const {
+    medicines, customers, categories, currentUser, settings, checkoutSale, updateCustomers
   } = useApp();
 
   // POS State
@@ -13,7 +13,7 @@ export const POS: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('walk-in');
   const [cart, setCart] = useState<{ medicine: Medicine; quantity: number }[]>([]);
-  
+
   // Discount & Taxes
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
   const [discountValue, setDiscountValue] = useState<number>(0);
@@ -40,13 +40,13 @@ export const POS: React.FC = () => {
   // Filter products based on search query and category
   const filteredProducts = useMemo(() => {
     return medicines.filter(med => {
-      const matchesSearch = 
+      const matchesSearch =
         med.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         med.genericName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         med.barcode.includes(searchQuery);
-      
+
       const matchesCategory = selectedCategory === 'all' || med.categoryId === selectedCategory;
-      
+
       return matchesSearch && matchesCategory;
     });
   }, [medicines, searchQuery, selectedCategory]);
@@ -91,9 +91,9 @@ export const POS: React.FC = () => {
           alert(`Cannot add more. Only ${med.stock} units available in stock.`);
           return prevCart;
         }
-        return prevCart.map(item => 
-          item.medicine.id === med.id 
-            ? { ...item, quantity: item.quantity + 1 } 
+        return prevCart.map(item =>
+          item.medicine.id === med.id
+            ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
@@ -165,7 +165,7 @@ export const POS: React.FC = () => {
     const savedSale = checkoutSale(saleRecord);
     setCompletedSale(savedSale);
     setShowCheckoutModal(true);
-    
+
     // Reset state
     setCart([]);
     setDiscountValue(0);
@@ -215,9 +215,9 @@ export const POS: React.FC = () => {
         <div className="search-filters">
           <div className="search-bar-wrapper">
             <Search size={18} className="search-icon" />
-            <input 
+            <input
               ref={searchInputRef}
-              type="text" 
+              type="text"
               placeholder="Search by Name, Formula, or Barcode (Scan)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -225,14 +225,14 @@ export const POS: React.FC = () => {
           </div>
 
           <div className="category-scroll">
-            <button 
+            <button
               className={`cat-pill ${selectedCategory === 'all' ? 'active' : ''}`}
               onClick={() => setSelectedCategory('all')}
             >
               All Medicines
             </button>
             {categories.map(cat => (
-              <button 
+              <button
                 key={cat.id}
                 className={`cat-pill ${selectedCategory === cat.id ? 'active' : ''}`}
                 onClick={() => setSelectedCategory(cat.id)}
@@ -248,10 +248,10 @@ export const POS: React.FC = () => {
           {filteredProducts.map(med => {
             const isOutOfStock = med.stock <= 0;
             const isLowStock = med.stock > 0 && med.stock <= med.minStockAlert;
-            
+
             return (
-              <div 
-                key={med.id} 
+              <div
+                key={med.id}
                 className={`product-card ${isOutOfStock ? 'out-of-stock' : ''}`}
                 onClick={() => !isOutOfStock && addToCart(med)}
               >
@@ -294,8 +294,8 @@ export const POS: React.FC = () => {
             <span className="item-count">{cart.length} items</span>
           </div>
 
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="btn btn-secondary btn-icon"
             onClick={() => setShowCustomerModal(true)}
             title="Register New Customer"
@@ -307,7 +307,7 @@ export const POS: React.FC = () => {
         {/* Customer Select */}
         <div className="customer-selection-box">
           <label>Select Customer Profile</label>
-          <select 
+          <select
             value={selectedCustomerId}
             onChange={(e) => setSelectedCustomerId(e.target.value)}
           >
@@ -351,7 +351,7 @@ export const POS: React.FC = () => {
                   <span className="item-total">
                     {formatPrice(item.medicine.retailPrice * item.quantity)}
                   </span>
-                  <button 
+                  <button
                     className="delete-item"
                     onClick={() => removeFromCart(item.medicine.id)}
                   >
@@ -372,21 +372,21 @@ export const POS: React.FC = () => {
 
           <div className="discount-adjuster">
             <div className="discount-type-toggles">
-              <button 
+              <button
                 className={`type-toggle ${discountType === 'percentage' ? 'active' : ''}`}
                 onClick={() => setDiscountType('percentage')}
               >
                 % Discount
               </button>
-              <button 
+              <button
                 className={`type-toggle ${discountType === 'fixed' ? 'active' : ''}`}
                 onClick={() => setDiscountType('fixed')}
               >
                 Rs. Discount
               </button>
             </div>
-            <input 
-              type="number" 
+            <input
+              type="number"
               min={0}
               placeholder="0"
               value={discountValue || ''}
@@ -408,25 +408,25 @@ export const POS: React.FC = () => {
           <div className="payment-options">
             <label>Payment Method</label>
             <div className="payment-grid">
-              <button 
+              <button
                 className={`pay-pill ${paymentMethod === 'Cash' ? 'active' : ''}`}
                 onClick={() => setPaymentMethod('Cash')}
               >
                 <Banknote size={16} /> Cash
               </button>
-              <button 
+              <button
                 className={`pay-pill ${paymentMethod === 'Card' ? 'active' : ''}`}
                 onClick={() => setPaymentMethod('Card')}
               >
                 <CreditCard size={16} /> Card
               </button>
-              <button 
+              <button
                 className={`pay-pill ${paymentMethod === 'Digital Wallet' ? 'active' : ''}`}
                 onClick={() => setPaymentMethod('Digital Wallet')}
               >
                 <Wallet size={16} /> Mobile Wallet
               </button>
-              <button 
+              <button
                 className={`pay-pill ${paymentMethod === 'Bank Transfer' ? 'active' : ''}`}
                 onClick={() => setPaymentMethod('Bank Transfer')}
               >
@@ -435,7 +435,7 @@ export const POS: React.FC = () => {
             </div>
           </div>
 
-          <button 
+          <button
             className="btn btn-primary checkout-btn"
             disabled={cart.length === 0}
             onClick={handleCheckout}
@@ -457,7 +457,7 @@ export const POS: React.FC = () => {
                 ✕
               </button>
             </div>
-            
+
             <div className="modal-body invoice-print-area">
               {/* Thermal Invoice (80mm) container */}
               <div className="receipt-container">
@@ -496,9 +496,9 @@ export const POS: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
-                
+
                 <div className="receipt-divider"></div>
-                
+
                 <div className="receipt-pricing">
                   <div className="pricing-row">
                     <span>Subtotal:</span>
@@ -551,8 +551,8 @@ export const POS: React.FC = () => {
           <div className="modal-content" style={{ maxWidth: '450px' }}>
             <div className="modal-header">
               <h3>Register New Customer</h3>
-              <button 
-                className="btn btn-secondary btn-icon" 
+              <button
+                className="btn btn-secondary btn-icon"
                 onClick={() => setShowCustomerModal(false)}
               >
                 ✕
@@ -562,8 +562,8 @@ export const POS: React.FC = () => {
               <div className="modal-body">
                 <div className="form-group">
                   <label>Customer Name *</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="e.g. Asif Raza"
                     value={newCustName}
                     onChange={(e) => setNewCustName(e.target.value)}
@@ -572,8 +572,8 @@ export const POS: React.FC = () => {
                 </div>
                 <div className="form-group">
                   <label>Phone Number *</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="e.g. 03001234567"
                     value={newCustPhone}
                     onChange={(e) => setNewCustPhone(e.target.value)}
@@ -582,8 +582,8 @@ export const POS: React.FC = () => {
                 </div>
                 <div className="form-group">
                   <label>Residential Address</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="e.g. Sector F-7, Islamabad"
                     value={newCustAddr}
                     onChange={(e) => setNewCustAddr(e.target.value)}
@@ -591,9 +591,9 @@ export const POS: React.FC = () => {
                 </div>
               </div>
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <button
+                  type="button"
+                  className="btn btn-secondary"
                   onClick={() => setShowCustomerModal(false)}
                 >
                   Cancel
@@ -790,7 +790,7 @@ export const POS: React.FC = () => {
           display: flex;
           flex-direction: column;
           height: 100%;
-          overflow: hidden;
+          // overflow: hidden;
           box-shadow: var(--shadow-sm);
         }
 
