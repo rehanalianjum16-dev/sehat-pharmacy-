@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { Login } from './views/Login';
 import RegisterPage from './app/(auth)/register/page';
+import { GoogleConsentPopup } from './views/GoogleConsentPopup';
 import { Dashboard } from './views/Dashboard';
 import { POS } from './views/POS';
 import { Inventory } from './views/Inventory';
@@ -15,6 +16,11 @@ import { Settings } from './views/Settings';
 
 const AppContent: React.FC = () => {
   const { currentUser, currentView } = useApp();
+
+  // Route OAuth popups
+  if (window.location.search.includes('oauth=google-consent')) {
+    return <GoogleConsentPopup />;
+  }
 
   // If user is not authenticated, check if they are trying to register
   if (currentView === 'register') {

@@ -26,11 +26,11 @@ interface AppContextType {
   notifications: AppNotification[];
   users: User[];
   login: (email: string, password: string, role: UserRole) => Promise<{ success: boolean; error?: string }>;
-  googleLogin: (role: UserRole) => Promise<{ success: boolean; error?: string; email?: string }>;
+  googleLogin: (role: UserRole, googleEmail?: string) => Promise<{ success: boolean; error?: string; email?: string }>;
   facebookLogin: (role: UserRole) => Promise<{ success: boolean; error?: string; email?: string }>;
   changePassword: (userId: string, currentPass: string, newPass: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  register: (name: string, email: string, passwordHash: string) => Promise<User>;
+  register: (name: string, email: string, passwordHash: string, role: UserRole) => Promise<User>;
   approveUser: (userId: string, role: UserRole) => void;
   rejectUser: (userId: string) => void;
   setView: (view: string) => void;
@@ -168,8 +168,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
-  const googleLogin = async (role: UserRole): Promise<{ success: boolean; error?: string; email?: string }> => {
-    const email = window.prompt("Simulate Google Login:\nEnter your Google Email:", "jane.doe@gmail.com");
+  const googleLogin = async (role: UserRole, googleEmail?: string): Promise<{ success: boolean; error?: string; email?: string }> => {
+    const email = googleEmail || window.prompt("Simulate Google Login:\nEnter your Google Email:", "jane.doe@gmail.com");
     if (!email) return { success: false, error: 'CANCELLED' };
 
     const usersList = LocalStorageDB.getUsers();
@@ -258,8 +258,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
-  const register = async (name: string, email: string, passwordHash: string): Promise<User> => {
-    const newUser = LocalStorageDB.registerUser(name, email, passwordHash);
+  const register = async (name: string, email: string, passwordHash: string, role: UserRole): Promise<User> => {
+    const newUser = LocalStorageDB.registerUser(name, email, passwordHash, role);
     syncStates();
     return newUser;
   };

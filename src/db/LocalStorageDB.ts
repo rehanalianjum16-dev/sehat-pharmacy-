@@ -1,5 +1,5 @@
 import type {
-  User, Category, Medicine, Supplier, Customer, Sale, PurchaseOrder, PharmacySettings
+  User, Category, Medicine, Supplier, Customer, Sale, PurchaseOrder, PharmacySettings, UserRole
 } from '../types/db';
 import {
   mockUsers, mockCategories, mockSuppliers, mockCustomers, mockMedicines, mockSettings, mockSales, mockPurchaseOrders
@@ -64,7 +64,7 @@ export class LocalStorageDB {
     setStorageItem('sehat_users', users);
   }
 
-  static registerUser(name: string, email: string, passwordHash: string): User {
+  static registerUser(name: string, email: string, passwordHash: string, role: UserRole): User {
     const users = this.getUsers();
     
     // Check if user already exists
@@ -77,7 +77,7 @@ export class LocalStorageDB {
       id: `usr-${Date.now()}`,
       email,
       name,
-      role: 'CASHIER', // default signup role
+      role,
       password: passwordHash,
       status: 'PENDING_APPROVAL'
     };
