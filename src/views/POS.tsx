@@ -538,7 +538,7 @@ export const POS: React.FC = () => {
                 Close Billing Panel
               </button>
               <button className="btn btn-primary" onClick={handlePrint}>
-                Print Receipt (Thermal/A4)
+                Print Receipt
               </button>
             </div>
           </div>
@@ -564,7 +564,7 @@ export const POS: React.FC = () => {
                   <label>Customer Name *</label>
                   <input
                     type="text"
-                    placeholder="e.g. Asif Raza"
+                    placeholder="e.g. Jhon Doe"
                     value={newCustName}
                     onChange={(e) => setNewCustName(e.target.value)}
                     required
@@ -577,7 +577,7 @@ export const POS: React.FC = () => {
                     placeholder="e.g. 03001234567"
                     value={newCustPhone}
                     onChange={(e) => setNewCustPhone(e.target.value)}
-                    required
+                  // required
                   />
                 </div>
                 <div className="form-group">
@@ -790,7 +790,7 @@ export const POS: React.FC = () => {
           display: flex;
           flex-direction: column;
           height: 100%;
-          // overflow: hidden;
+          overflow: hidden;
           box-shadow: var(--shadow-sm);
         }
 
