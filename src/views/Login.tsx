@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { UserRole } from '../types/db';
 import { Lock, Mail, ShieldAlert, KeyRound, ArrowLeft, Eye, EyeOff, User, Info } from 'lucide-react';
@@ -24,6 +24,40 @@ export const Login: React.FC = () => {
   // OAuth Simulation Modal States
   const [showOAuthModal, setShowOAuthModal] = useState(false);
   const [oauthProvider, setOauthProvider] = useState<'google' | 'facebook'>('google');
+
+  // Handle Google OAuth postMessage Callback
+  useEffect(() => {
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'GOOGLE_OAUTH_SUCCESS') {
+        const { email: googleEmailAddress } = event.data.user;
+        setLoading(true);
+        setError('');
+
+        // Mimic API latency
+        setTimeout(async () => {
+          const result = await googleLogin(role, googleEmailAddress);
+          setLoading(false);
+          if (!result.success) {
+            if (result.error === 'PENDING_APPROVAL') {
+              setError(`Security Notice: Google profile (${result.email}) is PENDING APPROVAL. An administrator must approve your account and assign your system role before you can log in.`);
+            } else if (result.error === 'ACCOUNT_REJECTED') {
+              setError(`Security Notice: Google profile (${result.email}) has been REJECTED by an administrator.`);
+            } else if (result.error === 'ROLE_MISMATCH') {
+              setError(`Security Notice: Google profile is registered under a different role. Please select the correct role matching your profile.`);
+            } else if (result.error === 'USER_NOT_REGISTERED') {
+              // Rule 3: Reject if unregistered
+              setError(`Authentication Failed: No account found for Google profile (${result.email}). Please sign up first.`);
+            } else {
+              setError('Google authentication failed. Please try again.');
+            }
+          }
+        }, 600);
+      }
+    };
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, [role, googleLogin]);
 
   // Handle Login Submit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,28 +89,18 @@ export const Login: React.FC = () => {
     }, 800);
   };
 
-  // Google OAuth simulator
-  const handleGoogleLogin = async () => {
+  // Google OAuth popup trigger
+  const handleGoogleLogin = () => {
     setError('');
-    setLoading(true);
-    setTimeout(async () => {
-      const result = await googleLogin(role);
-      setLoading(false);
-      if (!result.success && result.error !== 'CANCELLED') {
-        if (result.error === 'PENDING_APPROVAL') {
-          setError(`Security Notice: Google profile (${result.email}) is PENDING APPROVAL. An administrator must approve your account and assign your system role before you can log in.`);
-        } else if (result.error === 'ACCOUNT_REJECTED') {
-          setError(`Security Notice: Google profile (${result.email}) has been REJECTED by an administrator.`);
-        } else if (result.error === 'ROLE_MISMATCH') {
-          setError(`Security Notice: Google profile is registered under a different role. Please select the correct role matching your profile.`);
-        } else if (result.error === 'USER_NOT_REGISTERED') {
-          // Rule 3: Reject if unregistered
-          setError(`Authentication Failed: No account found for Google profile (${result.email}). Please sign up first.`);
-        } else {
-          setError('Google authentication failed. Please try again.');
-        }
-      }
-    }, 600);
+    const width = 500;
+    const height = 650;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      window.location.origin + '?oauth=google-consent',
+      'Google Consent Screen',
+      `width=${width},height=${height},top=${top},left=${left},status=no,resizable=no`
+    );
   };
 
   // Facebook OAuth simulator
@@ -1002,6 +1026,41 @@ export const Login: React.FC = () => {
           }
           .form-pane {
             padding: 36px 28px;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .login-page {
+            padding: 16px 12px;
+            background-color: var(--surface);
+          }
+          .split-container {
+            border: none;
+            box-shadow: none;
+            background-color: transparent;
+          }
+          .form-pane {
+            padding: 20px 16px;
+          }
+          .action-row-signup {
+            flex-direction: column;
+            gap: 16px;
+            align-items: stretch;
+          }
+          .pill-signup-btn {
+            width: 100%;
+            justify-content: center;
+          }
+          .social-signup-box {
+            justify-content: center;
+            width: 100%;
+          }
+          .register-header {
+            margin-top: 16px;
+            text-align: center;
+          }
+          .role-pills-row {
+            justify-content: center;
           }
         }
       `}</style>

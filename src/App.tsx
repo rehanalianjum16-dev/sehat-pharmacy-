@@ -8,6 +8,7 @@ import { GoogleConsentPopup } from './views/GoogleConsentPopup';
 import { Dashboard } from './views/Dashboard';
 import { POS } from './views/POS';
 import { Inventory } from './views/Inventory';
+import { Products } from './views/Products';
 import { Purchases } from './views/Purchases';
 import { People } from './views/People';
 import { Invoices } from './views/Invoices';
@@ -40,6 +41,8 @@ const AppContent: React.FC = () => {
         return <POS />;
       case 'inventory':
         return <Inventory />;
+      case 'products':
+        return <Products />;
       case 'purchases':
         return <Purchases />;
       case 'people':

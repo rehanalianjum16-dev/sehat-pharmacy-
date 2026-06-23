@@ -1,631 +1,326 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import type { Medicine, Category } from '../types/db';
-import { Search, Plus, Edit, Trash2, Layers, Filter, ShieldAlert } from 'lucide-react';
+import { 
+  ShieldAlert, AlertTriangle, Calendar, Layers, Search, 
+  ArrowUpRight, RefreshCw, Archive, MapPin 
+} from 'lucide-react';
 
 export const Inventory: React.FC = () => {
-  const { 
-    medicines, categories, updateMedicines, updateCategories, currentUser 
-  } = useApp();
-
-  // Search & Pagination States
+  const { medicines, categories, setView, setViewTab } = useApp();
   const [search, setSearch] = useState('');
-  const [catFilter, setCatFilter] = useState('all');
-  const [alertFilter, setAlertFilter] = useState<'all' | 'low_stock' | 'expiring' | 'expired'>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
-
-  // Medicine Edit Modal State
-  const [showMedModal, setShowMedModal] = useState(false);
-  const [editingMed, setEditingMed] = useState<Medicine | null>(null);
-  
-  // Medicine Form States
-  const [name, setName] = useState('');
-  const [genericName, setGenericName] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [barcode, setBarcode] = useState('');
-  const [purchasePrice, setPurchasePrice] = useState<number>(0);
-  const [retailPrice, setRetailPrice] = useState<number>(0);
-  const [rackLocation, setRackLocation] = useState('');
-  const [batchNumber, setBatchNumber] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [minStockAlert, setMinStockAlert] = useState<number>(10);
-  const [stock, setStock] = useState<number>(0);
-
-  // Category CRUD Modal State
-  const [showCatModal, setShowCatModal] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatDesc, setNewCatDesc] = useState('');
-  const [editingCat, setEditingCat] = useState<Category | null>(null);
 
   const systemDate = new Date('2026-06-20');
 
-  // Filter medicines
-  const filteredMedicines = useMemo(() => {
+  // Filtered Stock Alerts
+  const lowStockItems = useMemo(() => {
     return medicines.filter(med => {
-      const matchesSearch = 
-        med.name.toLowerCase().includes(search.toLowerCase()) ||
-        med.genericName.toLowerCase().includes(search.toLowerCase()) ||
-        med.barcode.includes(search);
-      
-      const matchesCategory = catFilter === 'all' || med.categoryId === catFilter;
-      
-      // Stock & Expiry alert status filters
-      const isLowStock = med.stock <= med.minStockAlert;
+      const matchesSearch = med.name.toLowerCase().includes(search.toLowerCase()) || 
+                            med.genericName.toLowerCase().includes(search.toLowerCase());
+      return med.stock <= med.minStockAlert && matchesSearch;
+    });
+  }, [medicines, search]);
+
+  // Filtered Expiry Risks (Expired or Expiring in 90 days)
+  const expiryRiskItems = useMemo(() => {
+    return medicines.filter(med => {
       const expDate = new Date(med.expiryDate);
       const daysDiff = Math.ceil((expDate.getTime() - systemDate.getTime()) / (1000 * 3600 * 24));
-      const isExpired = daysDiff <= 0;
-      const isExpiring = daysDiff > 0 && daysDiff <= 90;
+      
+      const matchesSearch = med.name.toLowerCase().includes(search.toLowerCase()) || 
+                            med.genericName.toLowerCase().includes(search.toLowerCase());
+      
+      return (daysDiff <= 90) && matchesSearch;
+    }).sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+  }, [medicines, search]);
 
-      let matchesAlert = true;
-      if (alertFilter === 'low_stock') matchesAlert = isLowStock;
-      else if (alertFilter === 'expired') matchesAlert = isExpired;
-      else if (alertFilter === 'expiring') matchesAlert = isExpiring;
-
-      return matchesSearch && matchesCategory && matchesAlert;
-    });
-  }, [medicines, search, catFilter, alertFilter]);
-
-  // Pagination calculation
-  const totalPages = Math.ceil(filteredMedicines.length / itemsPerPage);
-  const paginatedMedicines = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredMedicines.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredMedicines, currentPage]);
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
-
-  // Open Add Medicine Modal
-  const openAddMedModal = () => {
-    setEditingMed(null);
-    setName('');
-    setGenericName('');
-    setCategoryId(categories[0]?.id || '');
-    setBarcode('');
-    setPurchasePrice(0);
-    setRetailPrice(0);
-    setRackLocation('');
-    setBatchNumber('');
-    setExpiryDate('');
-    setMinStockAlert(10);
-    setStock(0);
-    setShowMedModal(true);
-  };
-
-  // Open Edit Medicine Modal
-  const openEditMedModal = (med: Medicine) => {
-    setEditingMed(med);
-    setName(med.name);
-    setGenericName(med.genericName);
-    setCategoryId(med.categoryId);
-    setBarcode(med.barcode);
-    setPurchasePrice(med.purchasePrice);
-    setRetailPrice(med.retailPrice);
-    setRackLocation(med.rackLocation);
-    setBatchNumber(med.batchNumber);
-    setExpiryDate(med.expiryDate);
-    setMinStockAlert(med.minStockAlert);
-    setStock(med.stock);
-    setShowMedModal(true);
-  };
-
-  // Save/Update Medicine
-  const handleSaveMedicine = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !barcode || !categoryId || !expiryDate) {
-      alert('Please fill out all required fields.');
-      return;
-    }
-
-    if (editingMed) {
-      // Update
-      const updated = medicines.map(m => m.id === editingMed.id ? {
-        ...m, name, genericName, categoryId, barcode, purchasePrice, retailPrice, rackLocation, batchNumber, expiryDate, minStockAlert, stock
-      } : m);
-      updateMedicines(updated);
-    } else {
-      // Create
-      const newMed: Medicine = {
-        id: `med-${Date.now()}`,
-        name, genericName, categoryId, barcode, purchasePrice, retailPrice, rackLocation, batchNumber, expiryDate, minStockAlert, stock
+  // Category Distribution & Valuation
+  const categoryAssets = useMemo(() => {
+    return categories.map(cat => {
+      const catMeds = medicines.filter(m => m.categoryId === cat.id);
+      const uniqueCount = catMeds.length;
+      const totalStock = catMeds.reduce((acc, curr) => acc + curr.stock, 0);
+      const assetValue = catMeds.reduce((acc, curr) => acc + (curr.stock * curr.purchasePrice), 0);
+      return {
+        id: cat.id,
+        name: cat.name,
+        uniqueCount,
+        totalStock,
+        assetValue
       };
-      updateMedicines([...medicines, newMed]);
-    }
-    setShowMedModal(false);
-  };
-
-  // Delete Medicine
-  const handleDeleteMedicine = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      const updated = medicines.filter(m => m.id !== id);
-      updateMedicines(updated);
-    }
-  };
-
-  // Save Category
-  const handleSaveCategory = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCatName) return;
-
-    if (editingCat) {
-      const updated = categories.map(c => c.id === editingCat.id ? {
-        ...c, name: newCatName, description: newCatDesc
-      } : c);
-      updateCategories(updated);
-      setEditingCat(null);
-    } else {
-      const newCat: Category = {
-        id: `cat-${Date.now()}`,
-        name: newCatName,
-        description: newCatDesc,
-        createdAt: new Date().toISOString()
-      };
-      updateCategories([...categories, newCat]);
-    }
-
-    setNewCatName('');
-    setNewCatDesc('');
-  };
-
-  // Delete Category
-  const handleDeleteCategory = (catId: string) => {
-    // Check if category contains medicines
-    const hasMedicines = medicines.some(m => m.categoryId === catId);
-    if (hasMedicines) {
-      alert('Cannot delete category. There are medicines registered under this category.');
-      return;
-    }
-
-    if (window.confirm('Are you sure you want to delete this category?')) {
-      const updated = categories.filter(c => c.id !== catId);
-      updateCategories(updated);
-    }
-  };
-
-  const getExpiryBadge = (expStr: string) => {
-    const expDate = new Date(expStr);
-    const daysDiff = Math.ceil((expDate.getTime() - systemDate.getTime()) / (1000 * 3600 * 24));
-    
-    if (daysDiff <= 0) return <span className="badge badge-danger">Expired</span>;
-    if (daysDiff <= 90) return <span className="badge badge-warning">{daysDiff} days</span>;
-    return <span className="badge badge-success">{expStr}</span>;
-  };
-
-  const getStockBadge = (stockQty: number, minQty: number) => {
-    if (stockQty <= 0) return <span className="badge badge-danger">Out of Stock</span>;
-    if (stockQty <= minQty) return <span className="badge badge-warning">Low ({stockQty})</span>;
-    return <span className="badge badge-success">{stockQty}</span>;
-  };
+    }).sort((a, b) => b.assetValue - a.assetValue);
+  }, [categories, medicines]);
 
   const formatPrice = (val: number) => {
     return 'Rs. ' + val.toLocaleString('en-US', { minimumFractionDigits: 2 });
   };
 
-  // Roles verification
-  const canEdit = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER';
+  const getDaysDiffLabel = (expiryStr: string) => {
+    const expDate = new Date(expiryStr);
+    const daysDiff = Math.ceil((expDate.getTime() - systemDate.getTime()) / (1000 * 3600 * 24));
+    
+    if (daysDiff <= 0) {
+      return <span className="label-risk expired">EXPIRED ({expiryStr})</span>;
+    } else if (daysDiff <= 30) {
+      return <span className="label-risk high-risk">Critical Expiry ({daysDiff} days)</span>;
+    } else {
+      return <span className="label-risk warning-risk">Expiring soon ({daysDiff} days)</span>;
+    }
+  };
+
+  const handleNavigateToPurchases = () => {
+    setView('purchases');
+  };
+
+  const handleNavigateToProducts = () => {
+    setView('products');
+    setViewTab('all');
+  };
 
   return (
-    <div className="inventory-view">
-      {/* Search and Action Bar */}
-      <div className="control-bar">
-        <div className="search-box">
-          <Search size={18} className="search-icon" />
+    <div className="inventory-dashboard-view animate-fade-in">
+      
+      {/* Top Header Card */}
+      <div className="inventory-header-panel">
+        <div className="header-meta">
+          <h2>Inventory Operations & Alerts Dashboard</h2>
+          <p>Real-time monitoring of batch thresholds, expiry warnings, and asset allocations.</p>
+        </div>
+
+        <div className="search-box-inventory">
+          <Search size={16} className="search-icon" />
           <input 
             type="text" 
-            placeholder="Search by name, chemical formula, barcode..."
+            placeholder="Search alerts by medicine name or formula..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+      </div>
 
-        <div className="filter-group">
-          <div className="select-wrapper">
-            <Filter size={14} className="select-icon" />
-            <select value={catFilter} onChange={(e) => { setCatFilter(e.target.value); setCurrentPage(1); }}>
-              <option value="all">All Categories</option>
-              {categories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+      {/* Primary Analytics Grid */}
+      <div className="inventory-analytics-row">
+        <div className="analytics-box-small shadow-premium border-left-danger">
+          <div className="meta-icon-container bg-danger-light text-danger">
+            <ShieldAlert size={20} />
           </div>
-
-          <div className="select-wrapper">
-            <ShieldAlert size={14} className="select-icon" />
-            <select value={alertFilter} onChange={(e) => { setAlertFilter(e.target.value as any); setCurrentPage(1); }}>
-              <option value="all">No Status Filters</option>
-              <option value="low_stock">Low Stock Alerts</option>
-              <option value="expiring">Expiring Soon (&lt;90 days)</option>
-              <option value="expired">Expired medicines</option>
-            </select>
+          <div className="analytics-value">
+            <span>Critical Stock Shortages</span>
+            <h3>{medicines.filter(m => m.stock <= 0).length} Items Out of Stock</h3>
           </div>
         </div>
 
-        <div className="action-buttons">
-          <button className="btn btn-secondary" onClick={() => setShowCatModal(true)}>
-            <Layers size={16} /> Manage Categories
-          </button>
-          {canEdit && (
-            <button className="btn btn-primary" onClick={openAddMedModal}>
-              <Plus size={16} /> Add Product
-            </button>
-          )}
+        <div className="analytics-box-small shadow-premium border-left-warning">
+          <div className="meta-icon-container bg-warning-light text-warning">
+            <AlertTriangle size={20} />
+          </div>
+          <div className="analytics-value">
+            <span>Low Stock Reorders</span>
+            <h3>{medicines.filter(m => m.stock > 0 && m.stock <= m.minStockAlert).length} Items Below Threshold</h3>
+          </div>
+        </div>
+
+        <div className="analytics-box-small shadow-premium border-left-success">
+          <div className="meta-icon-container bg-success-light text-success">
+            <Calendar size={20} />
+          </div>
+          <div className="analytics-value">
+            <span>Expiry Danger Zone</span>
+            <h3>{medicines.filter(m => {
+              const exp = new Date(m.expiryDate);
+              return exp.getTime() - systemDate.getTime() <= 90 * 24 * 60 * 60 * 1000;
+            }).length} Batches Under Risk</h3>
+          </div>
         </div>
       </div>
 
-      {/* Medicines Data Table */}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Barcode</th>
-              <th>Medicine Details</th>
-              <th>Category</th>
-              <th>Purchase P.</th>
-              <th>Retail P.</th>
-              <th>Rack</th>
-              <th>Stock</th>
-              <th>Expiry</th>
-              {canEdit && <th className="no-print">Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedMedicines.map(med => (
-              <tr key={med.id}>
-                <td>
-                  <span className="barcode-tag">{med.barcode}</span>
-                </td>
-                <td>
-                  <div className="med-title-cell">
-                    <strong>{med.name}</strong>
-                    <span className="generic-cell-formula">{med.genericName}</span>
-                    <span className="batch-cell-tag">Batch: {med.batchNumber}</span>
-                  </div>
-                </td>
-                <td>{med.categoryName}</td>
-                <td>{formatPrice(med.purchasePrice)}</td>
-                <td className="font-weight-600">{formatPrice(med.retailPrice)}</td>
-                <td>
-                  <span className="rack-badge">{med.rackLocation || 'N/A'}</span>
-                </td>
-                <td>{getStockBadge(med.stock, med.minStockAlert)}</td>
-                <td>{getExpiryBadge(med.expiryDate)}</td>
-                {canEdit && (
-                  <td className="no-print">
-                    <div className="action-cell-btns">
-                      <button 
-                        className="btn-action edit" 
-                        onClick={() => openEditMedModal(med)}
-                        title="Edit Medicine"
-                      >
-                        <Edit size={14} />
-                      </button>
-                      <button 
-                        className="btn-action delete" 
-                        onClick={() => handleDeleteMedicine(med.id)}
-                        title="Delete Medicine"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {filteredMedicines.length === 0 && (
-              <tr>
-                <td colSpan={canEdit ? 9 : 8} className="text-center">No medicines match the selected filter.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="pagination">
-          <button 
-            disabled={currentPage === 1}
-            onClick={() => handlePageChange(currentPage - 1)}
-          >
-            Prev
-          </button>
-          
-          <div className="page-nums">
-            {Array.from({ length: totalPages }).map((_, idx) => (
-              <button 
-                key={idx}
-                className={currentPage === idx + 1 ? 'active' : ''}
-                onClick={() => handlePageChange(idx + 1)}
-              >
-                {idx + 1}
-              </button>
-            ))}
-          </div>
-
-          <button 
-            disabled={currentPage === totalPages}
-            onClick={() => handlePageChange(currentPage + 1)}
-          >
-            Next
-          </button>
-        </div>
-      )}
-
-      {/* ================= MODALS ================= */}
-
-      {/* 1. Medicine Entry Form Modal */}
-      {showMedModal && (
-        <div className="modal-overlay">
-          <div className="modal-content med-form-modal">
-            <div className="modal-header">
-              <h3>{editingMed ? 'Edit Medicine Record' : 'Register New Medicine'}</h3>
-              <button className="btn btn-secondary btn-icon" onClick={() => setShowMedModal(false)}>
-                ✕
-              </button>
+      {/* Main Content split */}
+      <div className="inventory-content-split">
+        
+        {/* Left Side: Stock Alerts Directory */}
+        <div className="inventory-card shadow-premium">
+          <div className="card-header-action">
+            <div className="header-text-block">
+              <ShieldAlert className="text-red-icon" size={18} />
+              <h3>Stock Threshold Violations</h3>
             </div>
-            <form onSubmit={handleSaveMedicine}>
-              <div className="modal-body">
-                <div className="form-grid">
-                  <div className="form-group col-span-2">
-                    <label>Medicine Name *</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Panadol 500mg"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                    />
-                  </div>
+            <button className="btn btn-primary btn-sm" onClick={handleNavigateToPurchases}>
+              Record Stock Intake <ArrowUpRight size={14} />
+            </button>
+          </div>
 
-                  <div className="form-group col-span-2">
-                    <label>Generic Name / Formula *</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Paracetamol"
-                      value={genericName}
-                      onChange={(e) => setGenericName(e.target.value)}
-                      required
-                    />
-                  </div>
+          <p className="card-description">Products requiring immediate procurement order requests to maintain operations.</p>
 
-                  <div className="form-group">
-                    <label>Category *</label>
-                    <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-                      {categories.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
+          <div className="alerts-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product Details</th>
+                  <th>Shelf Loc.</th>
+                  <th>Active Qty</th>
+                  <th>Min Alert</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lowStockItems.map(med => (
+                  <tr key={med.id}>
+                    <td>
+                      <div className="alert-med-meta">
+                        <strong>{med.name}</strong>
+                        <span className="generic-subtitle">{med.genericName}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="rack-label-tag"><MapPin size={10} /> {med.rackLocation || 'N/A'}</span>
+                    </td>
+                    <td className={`font-weight-700 ${med.stock === 0 ? 'text-red' : 'text-orange'}`}>
+                      {med.stock} units
+                    </td>
+                    <td>{med.minStockAlert} units</td>
+                    <td>
+                      {med.stock === 0 ? (
+                        <span className="badge badge-danger">OUT OF STOCK</span>
+                      ) : (
+                        <span className="badge badge-warning">LOW STOCK</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {lowStockItems.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-center text-muted">No stock alert warnings found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-                  <div className="form-group">
-                    <label>SKU / Barcode *</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. 8964000..."
-                      value={barcode}
-                      onChange={(e) => setBarcode(e.target.value)}
-                      required
-                    />
-                  </div>
+        {/* Right Side: Expiry Risk Warnings */}
+        <div className="inventory-card shadow-premium">
+          <div className="card-header-action">
+            <div className="header-text-block">
+              <Calendar className="text-orange-icon" size={18} />
+              <h3>Expiry Risk Analysis</h3>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={handleNavigateToProducts}>
+              View Product Details
+            </button>
+          </div>
 
-                  <div className="form-group">
-                    <label>Purchase Price (Rs.) *</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      min="0"
-                      value={purchasePrice || ''}
-                      onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
-                      required
-                    />
-                  </div>
+          <p className="card-description">Batches approaching expiry within 90 days. Plan clearance or record batch disposal.</p>
 
-                  <div className="form-group">
-                    <label>Retail Price (Rs.) *</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      min="0"
-                      value={retailPrice || ''}
-                      onChange={(e) => setRetailPrice(parseFloat(e.target.value) || 0)}
-                      required
-                    />
-                  </div>
+          <div className="alerts-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product & Batch</th>
+                  <th>Shelf Location</th>
+                  <th>Stock Qty</th>
+                  <th>Status / Expiry</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expiryRiskItems.map(med => (
+                  <tr key={med.id}>
+                    <td>
+                      <div className="alert-med-meta">
+                        <strong>{med.name}</strong>
+                        <span className="generic-subtitle">Batch: {med.batchNumber || 'N/A'}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="rack-label-tag"><MapPin size={10} /> {med.rackLocation || 'N/A'}</span>
+                    </td>
+                    <td>{med.stock} units</td>
+                    <td>{getDaysDiffLabel(med.expiryDate)}</td>
+                  </tr>
+                ))}
+                {expiryRiskItems.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="text-center text-muted">No impending expiry warning risks detected.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-                  <div className="form-group">
-                    <label>Rack Location / Location</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. A-12"
-                      value={rackLocation}
-                      onChange={(e) => setRackLocation(e.target.value)}
-                    />
-                  </div>
+      </div>
 
-                  <div className="form-group">
-                    <label>Batch Number</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. BT-921"
-                      value={batchNumber}
-                      onChange={(e) => setBatchNumber(e.target.value)}
-                    />
-                  </div>
+      {/* Category Asset Valuation Distribution */}
+      <div className="inventory-card shadow-premium category-assets-section">
+        <div className="card-header-action">
+          <div className="header-text-block">
+            <Layers className="text-primary-icon" size={18} />
+            <h3>Category Assets Valuation Distribution</h3>
+          </div>
+        </div>
+        <p className="card-description">Monetary asset allocation and total stock volumes grouped by therapeutics category nodes.</p>
 
-                  <div className="form-group">
-                    <label>Expiry Date *</label>
-                    <input 
-                      type="date" 
-                      value={expiryDate}
-                      onChange={(e) => setExpiryDate(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Min Stock Threshold</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={minStockAlert || ''}
-                      onChange={(e) => setMinStockAlert(parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-
-                  <div className="form-group col-span-2">
-                    <label>Opening Stock Quantity</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={stock || ''}
-                      onChange={(e) => setStock(parseInt(e.target.value) || 0)}
-                      disabled={!!editingMed} // Stock updates are recorded via Purchases orders once saved
-                    />
-                    {editingMed && <span className="helper-text">To update active stock levels, record a new supplier Purchase Order.</span>}
-                  </div>
+        <div className="category-valuation-grid">
+          {categoryAssets.map(asset => (
+            <div key={asset.id} className="category-value-card">
+              <div className="value-meta-info">
+                <h4>{asset.name}</h4>
+                <span className="unique-count-label">{asset.uniqueCount} products</span>
+              </div>
+              <div className="value-metrics-row">
+                <div className="metric-col">
+                  <span>Stock Volume</span>
+                  <strong>{asset.totalStock.toLocaleString()} units</strong>
+                </div>
+                <div className="metric-col">
+                  <span>Asset Value (Cost)</span>
+                  <strong className="text-primary-val">{formatPrice(asset.assetValue)}</strong>
                 </div>
               </div>
-              
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowMedModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Save Product
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Categories Drawer Modal */}
-      {showCatModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '550px' }}>
-            <div className="modal-header">
-              <h3>Manage Medicine Categories</h3>
-              <button className="btn btn-secondary btn-icon" onClick={() => setShowCatModal(false)}>
-                ✕
-              </button>
             </div>
-            <div className="modal-body">
-              {/* Category creation inline form */}
-              {canEdit && (
-                <form onSubmit={handleSaveCategory} className="category-inline-form">
-                  <h4>{editingCat ? 'Modify Category' : 'Register New Category'}</h4>
-                  <div className="form-group">
-                    <label>Category Title</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Injections" 
-                      value={newCatName}
-                      onChange={(e) => setNewCatName(e.target.value)}
-                      required 
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Description</label>
-                    <input 
-                      type="text" 
-                      placeholder="Usage or description details" 
-                      value={newCatDesc}
-                      onChange={(e) => setNewCatDesc(e.target.value)}
-                    />
-                  </div>
-                  <div className="btn-group-row">
-                    {editingCat && (
-                      <button 
-                        type="button" 
-                        className="btn btn-secondary btn-sm" 
-                        onClick={() => {
-                          setEditingCat(null);
-                          setNewCatName('');
-                          setNewCatDesc('');
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    )}
-                    <button type="submit" className="btn btn-primary btn-sm">
-                      {editingCat ? 'Save Changes' : 'Create Category'}
-                    </button>
-                  </div>
-                  <hr className="divider-line" />
-                </form>
-              )}
-
-              {/* Categories list */}
-              <div className="categories-list-drawer">
-                <h4>Registered Categories</h4>
-                <ul className="category-drawer-ul">
-                  {categories.map(c => (
-                    <li key={c.id} className="category-drawer-li">
-                      <div className="cat-meta-drawer">
-                        <strong>{c.name}</strong>
-                        <p>{c.description || 'No description provided'}</p>
-                      </div>
-                      {canEdit && (
-                        <div className="cat-actions-drawer">
-                          <button 
-                            className="btn-action edit"
-                            onClick={() => {
-                              setEditingCat(c);
-                              setNewCatName(c.name);
-                              setNewCatDesc(c.description);
-                            }}
-                          >
-                            <Edit size={12} />
-                          </button>
-                          <button 
-                            className="btn-action delete"
-                            onClick={() => handleDeleteCategory(c.id)}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+      </div>
 
       <style>{`
-        .inventory-view {
+        .inventory-dashboard-view {
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 24px;
         }
 
-        .control-bar {
+        .inventory-header-panel {
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          gap: 16px;
           background-color: var(--surface);
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
-          padding: 16px;
+          padding: 20px 24px;
+          gap: 20px;
           box-shadow: var(--shadow-sm);
         }
 
-        .search-box {
+        .header-meta h2 {
+          font-size: 18px;
+          font-weight: 600;
+          margin-bottom: 4px;
+        }
+
+        .header-meta p {
+          font-size: 12.5px;
+          color: var(--text-muted);
+        }
+
+        .search-box-inventory {
           position: relative;
-          flex: 1;
+          width: 350px;
         }
 
-        .search-box input {
-          padding-left: 38px;
+        .search-box-inventory input {
+          padding-left: 36px;
+          height: 38px;
         }
 
-        .search-box .search-icon {
+        .search-box-inventory .search-icon {
           position: absolute;
           left: 12px;
           top: 50%;
@@ -633,234 +328,274 @@ export const Inventory: React.FC = () => {
           color: var(--text-muted);
         }
 
-        .filter-group {
+        .inventory-analytics-row {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+        }
+
+        .analytics-box-small {
+          background-color: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          padding: 20px;
           display: flex;
-          gap: 12px;
+          align-items: center;
+          gap: 16px;
         }
 
-        .select-wrapper {
-          position: relative;
-        }
+        .border-left-danger { border-left: 4px solid var(--danger); }
+        .border-left-warning { border-left: 4px solid var(--warning); }
+        .border-left-success { border-left: 4px solid var(--success); }
 
-        .select-icon {
-          position: absolute;
-          left: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--primary);
-        }
-
-        .select-wrapper select {
-          padding-left: 34px;
-          width: 180px;
-        }
-
-        .action-buttons {
+        .meta-icon-container {
+          width: 44px;
+          height: 44px;
+          border-radius: var(--radius-sm);
           display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .analytics-value {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .analytics-value span {
+          font-size: 11px;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .analytics-value h3 {
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--text);
+        }
+
+        .inventory-content-split {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 24px;
+        }
+
+        .inventory-card {
+          background-color: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .card-header-action {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 4px;
+        }
+
+        .header-text-block {
+          display: flex;
+          align-items: center;
           gap: 8px;
         }
 
-        /* Medicine Cells */
-        .med-title-cell {
+        .header-text-block h3 {
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--text);
+        }
+
+        .text-red-icon { color: var(--danger); }
+        .text-orange-icon { color: var(--warning); }
+        .text-primary-icon { color: var(--primary); }
+
+        .card-description {
+          font-size: 12px;
+          color: var(--text-muted);
+          margin-bottom: 20px;
+        }
+
+        .alerts-table-wrapper {
+          overflow-y: auto;
+          max-height: 340px;
+          padding-right: 4px;
+        }
+
+        .alerts-table-wrapper table {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+        }
+
+        .alerts-table-wrapper th,
+        .alerts-table-wrapper td {
+          padding: 10px 12px;
+          border-bottom: 1px solid var(--border);
+          font-size: 13px;
+        }
+
+        .alerts-table-wrapper th {
+          background-color: var(--surface-header);
+          color: var(--text-muted);
+          font-weight: 600;
+          position: sticky;
+          top: 0;
+          z-index: 2;
+        }
+
+        .alert-med-meta {
           display: flex;
           flex-direction: column;
           gap: 2px;
         }
 
-        .generic-cell-formula {
+        .generic-subtitle {
           font-size: 11px;
           color: var(--text-muted);
-          font-style: italic;
         }
 
-        .batch-cell-tag {
-          font-size: 10px;
-          font-family: monospace;
-          background-color: var(--background);
-          width: fit-content;
-          padding: 1px 4px;
-          border-radius: 4px;
-          color: var(--text-muted);
-          border: 1px solid var(--border);
-        }
-
-        .barcode-tag {
-          font-family: monospace;
+        .rack-label-tag {
           font-size: 11px;
           color: var(--text-muted);
-          background-color: var(--surface-header);
-          padding: 4px 8px;
-          border-radius: var(--radius-xs);
-          border: 1px solid var(--border);
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
         }
 
-        .rack-badge {
-          background-color: var(--primary-light);
-          color: var(--primary);
-          font-weight: 600;
-          font-size: 11px;
+        .text-red { color: var(--danger); }
+        .text-orange { color: var(--warning); }
+
+        .label-risk {
+          font-size: 10.5px;
+          font-weight: 700;
           padding: 2px 6px;
           border-radius: 4px;
+          text-transform: uppercase;
         }
 
-        .action-cell-btns {
-          display: flex;
-          gap: 6px;
+        .label-risk.expired { background-color: var(--danger-light); color: var(--danger); }
+        .label-risk.high-risk { background-color: #fee2e2; color: #b91c1c; }
+        .label-risk.warning-risk { background-color: #fef3c7; color: #d97706; }
+
+        /* Category Assets Valuation Section */
+        .category-assets-section {
+          width: 100%;
         }
 
-        .btn-action {
-          width: 28px;
-          height: 28px;
-          border-radius: var(--radius-xs);
-          border: 1px solid var(--border);
-          background-color: var(--surface);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: var(--transition);
-        }
-
-        .btn-action.edit { color: var(--secondary); }
-        .btn-action.edit:hover { background-color: var(--secondary-light); border-color: var(--secondary); }
-
-        .btn-action.delete { color: var(--danger); }
-        .btn-action.delete:hover { background-color: var(--danger-light); border-color: var(--danger); }
-
-        /* Pagination */
-        .pagination {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          background-color: var(--surface);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          padding: 12px 24px;
-          box-shadow: var(--shadow-sm);
-        }
-
-        .pagination button {
-          border: 1px solid var(--border);
-          background-color: var(--surface);
-          color: var(--text);
-          padding: 6px 14px;
-          border-radius: var(--radius-xs);
-          font-size: 13px;
-          cursor: pointer;
-          transition: var(--transition);
-        }
-
-        .pagination button:hover:not(:disabled) {
-          border-color: var(--primary);
-          color: var(--primary);
-        }
-
-        .pagination button:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-        }
-
-        .page-nums {
-          display: flex;
-          gap: 6px;
-        }
-
-        .page-nums button {
-          padding: 6px 10px;
-        }
-
-        .page-nums button.active {
-          background-color: var(--primary);
-          color: var(--text-inverse);
-          border-color: var(--primary);
-        }
-
-        /* Medicine Modal */
-        .med-form-modal {
-          max-width: 650px;
-        }
-
-        .form-grid {
+        .category-valuation-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(4, 1fr);
           gap: 16px;
         }
 
-        .col-span-2 {
-          grid-column: 1 / -1;
-        }
-
-        .helper-text {
-          font-size: 11px;
-          color: var(--text-muted);
-          margin-top: 4px;
-          display: block;
-        }
-
-        /* Categories Modal */
-        .category-inline-form {
+        .category-value-card {
           background-color: var(--background);
-          padding: 16px;
+          border: 1px solid var(--border);
           border-radius: var(--radius-sm);
-          border: 1px dashed var(--border);
-          margin-bottom: 20px;
-        }
-
-        .category-inline-form h4 {
-          margin-bottom: 12px;
-          font-size: 14px;
-        }
-
-        .btn-group-row {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-          margin-top: 10px;
-        }
-
-        .divider-line {
-          border: 0;
-          border-top: 1px solid var(--border);
-          margin: 16px 0;
-        }
-
-        .categories-list-drawer h4 {
-          margin-bottom: 12px;
-          font-size: 14px;
-        }
-
-        .category-drawer-ul {
-          list-style: none;
+          padding: 16px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
-          max-height: 240px;
-          overflow-y: auto;
+          gap: 12px;
+          transition: var(--transition);
         }
 
-        .category-drawer-li {
+        .category-value-card:hover {
+          transform: translateY(-2px);
+          border-color: var(--primary);
+        }
+
+        .value-meta-info {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 10px 12px;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-xs);
-          background-color: var(--surface);
+          border-bottom: 1px solid var(--border);
+          padding-bottom: 8px;
         }
 
-        .cat-meta-drawer strong {
-          font-size: 13px;
+        .value-meta-info h4 {
+          font-size: 14px;
+          font-weight: 700;
           color: var(--text);
         }
 
-        .cat-meta-drawer p {
-          font-size: 11.5px;
+        .unique-count-label {
+          font-size: 11px;
           color: var(--text-muted);
         }
 
-        .cat-actions-drawer {
+        .value-metrics-row {
           display: flex;
-          gap: 6px;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .metric-col {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .metric-col span {
+          font-size: 10px;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+
+        .metric-col strong {
+          font-size: 12.5px;
+          color: var(--text);
+        }
+
+        .text-primary-val {
+          color: var(--primary) !important;
+          font-weight: 700 !important;
+        }
+
+        .shadow-premium {
+          box-shadow: var(--shadow-sm);
+          border: 1px solid var(--border);
+        }
+
+        .animate-fade-in {
+          animation: fadeIn 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 992px) {
+          .inventory-analytics-row {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+          .inventory-content-split {
+            grid-template-columns: 1fr;
+            gap: 20px;
+          }
+          .category-valuation-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 576px) {
+          .category-valuation-grid {
+            grid-template-columns: 1fr;
+          }
+          .inventory-header-panel {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .search-box-inventory {
+            width: 100%;
+          }
         }
       `}</style>
     </div>

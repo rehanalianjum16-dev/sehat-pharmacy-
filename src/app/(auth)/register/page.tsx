@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
-import { Eye, EyeOff, Lock, Mail, User, ShieldAlert, CheckCircle, Info, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, User, ShieldAlert, CheckCircle, Info, ArrowLeft, Shield } from 'lucide-react';
+import type { UserRole } from '../../../types/db';
 
 export default function RegisterPage() {
   const { setView, register } = useApp();
@@ -13,17 +14,38 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [requestedRole, setRequestedRole] = useState<UserRole>('CASHIER');
 
   // Submit Feedback States
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Google Simulated Modal States
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleName, setGoogleName] = useState('Jane Doe');
-  const [googleEmail, setGoogleEmail] = useState('jane.doe@gmail.com');
-  const [isCustomGoogle, setIsCustomGoogle] = useState(false);
+  // Google OAuth postMessage Callback Listener
+  useEffect(() => {
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'GOOGLE_OAUTH_SUCCESS') {
+        const { name: googleName, email: googleEmail } = event.data.user;
+        setLoading(true);
+        setError('');
+        try {
+          // Simulate OAuth latency
+          await new Promise((resolve) => setTimeout(resolve, 600));
+
+          // Register user with Google profile details and selected requestedRole
+          await register(`Google User (${googleName})`, googleEmail.trim().toLowerCase(), 'google-oauth-simulated', requestedRole);
+          setSuccess(true);
+        } catch (err: any) {
+          setError(err?.message || 'Google registration failed.');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
+  }, [requestedRole, register]);
 
   // Password Rules Checked in real-time
   const rules = useMemo(() => {
@@ -57,8 +79,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // Call Context Register to persist user in mock database
-      await register(name, email, password);
+      // Call Context Register to persist user in mock database with requested role
+      await register(name, email, password, requestedRole);
       setSuccess(true);
       setName('');
       setEmail('');
@@ -71,27 +93,19 @@ export default function RegisterPage() {
     }
   };
 
-  // Handle Simulated Google Signup
-  const handleGoogleSignupSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!googleEmail.trim()) return;
-
-    setLoading(true);
+  // Google OAuth popup trigger
+  const handleGoogleSignup = () => {
     setError('');
-    setShowGoogleModal(false);
+    const width = 500;
+    const height = 650;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      window.location.origin + '?oauth=google-consent',
+      'Google Consent Screen',
+      `width=${width},height=${height},top=${top},left=${left},status=no,resizable=no`
+    );
 
-    try {
-      // Simulate OAuth latency
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      // Call register inside AppContext
-      await register(`Google User (${googleName})`, googleEmail.trim().toLowerCase(), 'google-oauth-simulated');
-      setSuccess(true);
-    } catch (err: any) {
-      setError(err?.message || 'Google registration failed.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const selectMockGoogleAccount = (name: string, email: string) => {
@@ -183,6 +197,22 @@ export default function RegisterPage() {
                 />
               </div>
 
+              {/* Requested Role Dropdown */}
+              <div className="form-group-minimal">
+                <Shield size={16} className="field-icon" />
+                <select
+                  value={requestedRole}
+                  onChange={(e) => setRequestedRole(e.target.value as UserRole)}
+                  disabled={loading}
+                  required
+                  className="minimal-select"
+                >
+                  <option value="ADMIN">Admin</option>
+                  <option value="MANAGER">Manager</option>
+                  <option value="CASHIER">Sales Staff</option>
+                </select>
+              </div>
+
               {/* Password */}
               <div className="form-group-minimal">
                 <Lock size={16} className="field-icon" />
@@ -253,8 +283,8 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     className="social-circle-btn google"
-                    onClick={() => setShowGoogleModal(true)}
-                    title="Sign up with Google (Simulated)"
+                    onClick={handleGoogleSignup}
+                    title="Sign up with Google"
                   >
                     <svg viewBox="0 0 24 24" width="16" height="16">
                       <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.41 0-6.19-2.78-6.19-6.19s2.78-6.19 6.19-6.19c1.55 0 2.96.57 4.05 1.51l3.1-3.1C19.16 2.03 15.86 1 12.24 1 5.92 1 1 5.92 1 12s4.92 11 11.24 11c6.53 0 11.38-4.7 11.38-11.38 0-.66-.08-1.32-.22-1.94H12.24z" />
@@ -934,130 +964,23 @@ export default function RegisterPage() {
           left: 60px;
         }
 
-        /* Google Simulation Modal Styling */
-        .google-modal-overlay {
-          position: fixed;
-          inset: 0;
-          background-color: rgba(0, 0, 0, 0.4);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          animation: fadeIn 0.2s ease-out;
-        }
-
-        .google-modal-card {
-          background-color: var(--surface);
-          border-radius: var(--radius-md);
-          border: 1px solid var(--border);
-          box-shadow: var(--shadow-lg);
-          max-width: 480px;
-          width: 90%;
-          padding: 28px;
-          box-sizing: border-box;
-          animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .google-modal-header {
-          display: flex;
-          align-items: center;
-          margin-bottom: 16px;
-        }
-
-        .google-modal-header h3 {
-          font-size: 20px;
-          font-weight: 700;
-          color: var(--text);
-        }
-
-        .google-desc {
-          font-size: 13px;
-          color: var(--text-muted);
-          line-height: 1.5;
-          margin-bottom: 20px;
-        }
-
-        .google-quick-profiles {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          margin-bottom: 20px;
-        }
-
-        .google-profile-tab {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          padding: 12px 16px;
-          border-radius: var(--radius-sm);
-          border: 1px solid var(--border);
-          background-color: var(--background);
-          cursor: pointer;
-          transition: var(--transition);
-          text-align: left;
+        .minimal-select {
           width: 100%;
-        }
-
-        .google-profile-tab:hover {
-          border-color: var(--primary);
-          background-color: var(--surface);
-        }
-
-        .google-profile-tab.active {
-          border-color: var(--primary);
-          background-color: var(--primary-light);
-          box-shadow: 0 0 0 2px var(--primary-glow);
-        }
-
-        .google-profile-tab .profile-name {
+          padding: 10px 14px 10px 32px;
+          font-family: var(--font-sans);
           font-size: 13.5px;
-          font-weight: 600;
+          border: none !important;
+          background: transparent !important;
+          outline: none !important;
+          box-shadow: none !important;
           color: var(--text);
-        }
-
-        .google-profile-tab .profile-email {
-          font-size: 12px;
-          color: var(--text-muted);
-          margin-top: 2px;
-        }
-
-        .custom-fields-group {
-          background-color: var(--background);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-sm);
-          padding: 16px;
-          margin-bottom: 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .form-group-google {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .form-group-google label {
-          font-size: 11px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--text-muted);
-        }
-
-        .form-group-google input {
-          width: 100%;
           height: 38px;
-          padding: 8px 12px;
-          font-size: 13px;
+          cursor: pointer;
         }
 
-        .google-modal-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
+        .minimal-select option {
+          background-color: var(--surface);
+          color: var(--text);
         }
 
         /* Floating animations */
@@ -1091,6 +1014,41 @@ export default function RegisterPage() {
           }
           .form-pane {
             padding: 36px 28px;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .register-page {
+            padding: 16px 12px;
+            background-color: var(--surface);
+          }
+          .split-container {
+            border: none;
+            box-shadow: none;
+            background-color: transparent;
+          }
+          .form-pane {
+            padding: 20px 16px;
+          }
+          .action-row-signup {
+            flex-direction: column;
+            gap: 16px;
+            align-items: stretch;
+          }
+          .pill-signup-btn {
+            width: 100%;
+            justify-content: center;
+          }
+          .social-signup-box {
+            justify-content: center;
+            width: 100%;
+          }
+          .register-header {
+            margin-top: 16px;
+            text-align: center;
+          }
+          .role-pills-row {
+            justify-content: center;
           }
         }
 

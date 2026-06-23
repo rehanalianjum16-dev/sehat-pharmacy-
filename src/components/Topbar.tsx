@@ -1,12 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Bell, Calendar, Shield, Pill, AlertTriangle } from 'lucide-react';
+import { 
+  Bell, Calendar, Shield, Pill, AlertTriangle, 
+  Plus, ShoppingCart, UserPlus, FileText, Sun, Moon 
+} from 'lucide-react';
 
 export const Topbar: React.FC = () => {
-  const { currentView, notifications, currentUser, logout, changePassword } = useApp();
+  const { 
+    currentView, notifications, currentUser, logout, changePassword, 
+    settings, setView, setViewTab, setActiveModal, darkMode, toggleTheme 
+  } = useApp();
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
+  // Live Digital Clock state
+  const [time, setTime] = useState<Date | null>(null);
 
   // Change Password Form State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -18,15 +29,29 @@ export const Topbar: React.FC = () => {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const quickCreateRef = useRef<HTMLDivElement>(null);
+
+  // Initialize live ticking clock client-side
+  useEffect(() => {
+    setTime(new Date());
+    const timer = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setShowNotifications(false);
       }
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(target)) {
         setShowProfileDropdown(false);
+      }
+      if (quickCreateRef.current && !quickCreateRef.current.contains(target)) {
+        setShowQuickCreate(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -36,23 +61,37 @@ export const Topbar: React.FC = () => {
   const getViewTitle = () => {
     switch (currentView) {
       case 'dashboard': return 'Analytics Dashboard';
-      case 'pos': return 'Point of Sale (POS) Billing';
-      case 'inventory': return 'Inventory & Product Directory';
-      case 'purchases': return 'Purchases & Stock Intake';
-      case 'people': return 'Suppliers & Customers Ledger';
+      case 'pos': return 'Point of Sale (POS)';
+      case 'inventory': return 'Inventory & Alerts';
+      case 'products': return 'Product Management';
+      case 'purchases': return 'Purchases & Stock';
+      case 'people': return 'Suppliers & Customers';
       case 'invoices': return 'Invoices & Sales Log';
-      case 'reports': return 'Financial Reports';
+      case 'reports': return 'Financial Analytics';
       case 'settings': return 'System Configurations';
       default: return 'Sehat Pharmacy';
     }
   };
 
-  const systemDateFormatted = new Date('2026-06-20').toLocaleDateString('en-US', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
+  const formatTime = (date: Date | null) => {
+    if (!date) return '';
+    return date.toLocaleTimeString('en-US', {
+      hour12: true,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return '';
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
 
   const handleOpenChangePassword = () => {
     setCurrentPassword('');
@@ -108,16 +147,86 @@ export const Topbar: React.FC = () => {
   };
 
   return (
-    <header className="topbar no-print">
+    <header className="topbar no-print shadow-sm">
+      
+      {/* LEFT SIDE: Branding Logo (strictly out of Sidebar) and Dynamic View Title */}
       <div className="topbar-left">
+        {currentUser && (
+          <div className="topbar-brand" onClick={() => setView(currentUser.role === 'CASHIER' ? 'pos' : 'dashboard')}>
+            <div className="brand-logo-small">
+              <span>+</span>
+            </div>
+            <div className="brand-title-meta">
+              <h2>{settings.pharmacyName}</h2>
+              <span className="brand-system-tag">Management System</span>
+            </div>
+          </div>
+        )}
+        <div className="brand-divider"></div>
         <h1 className="view-title">{getViewTitle()}</h1>
       </div>
 
+      {/* RIGHT SIDE: Quick Create, Clock, Alerts, Theme, and Profile */}
       <div className="topbar-right">
-        {/* System Date Calendar */}
-        <div className="system-date">
-          <Calendar size={16} className="text-primary" />
-          <span>{systemDateFormatted}</span>
+        
+        {/* Quick Create Dropdown Menu */}
+        {currentUser && currentUser.role !== 'CASHIER' && (
+          <div className="quick-create-wrapper" ref={quickCreateRef}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm quick-create-trigger"
+              onClick={() => setShowQuickCreate(!showQuickCreate)}
+              title="Quickly create system entities"
+            >
+              <Plus size={15} />
+              <span>Quick Create</span>
+            </button>
+            {showQuickCreate && (
+              <div className="quick-create-dropdown scale-up">
+                <div className="dropdown-title">Quick Actions</div>
+                <ul className="quick-create-menu">
+                  <li>
+                    <button onClick={() => { setView('products'); setViewTab('all'); setActiveModal('create-product'); setShowQuickCreate(false); }}>
+                      <Pill size={14} className="icon-blue" />
+                      <span>Create Product</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => { setView('pos'); setShowQuickCreate(false); }}>
+                      <ShoppingCart size={14} className="icon-green" />
+                      <span>New POS Invoice</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => { setView('people'); setActiveModal('add-customer'); setShowQuickCreate(false); }}>
+                      <UserPlus size={14} className="icon-orange" />
+                      <span>Add Customer</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => { setView('people'); setActiveModal('add-supplier'); setShowQuickCreate(false); }}>
+                      <UserPlus size={14} className="icon-purple" />
+                      <span>Add Supplier</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => { setView('purchases'); setActiveModal('create-po'); setShowQuickCreate(false); }}>
+                      <FileText size={14} className="icon-indigo" />
+                      <span>New Purchase Order</span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Live Digital Clock */}
+        <div className="system-date-clock shadow-inner">
+          <Calendar size={15} className="clock-calendar-icon" />
+          <span className="clock-datetime">
+            {formatDate(time)} • <strong className="ticking-time">{formatTime(time) || 'Loading...'}</strong>
+          </span>
         </div>
 
         {/* Notifications Icon & Drawer */}
@@ -166,7 +275,17 @@ export const Topbar: React.FC = () => {
           )}
         </div>
 
-        {/* User Profile Avatar directly next to notifications (Rule 4) */}
+        {/* Theme Toggle Button next to profile avatar */}
+        <button
+          type="button"
+          className="icon-btn theme-toggle-topbar"
+          onClick={toggleTheme}
+          title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {darkMode ? <Sun size={18} className="theme-icon-sun" /> : <Moon size={18} className="theme-icon-moon" />}
+        </button>
+
+        {/* User Profile Avatar and Dropdown */}
         <div className="profile-wrapper" ref={profileDropdownRef}>
           <button
             className="avatar-trigger-btn"
@@ -291,23 +410,157 @@ export const Topbar: React.FC = () => {
           padding: 10px 24px;
           position: sticky;
           top: 0;
-          z-index: 9;
+          z-index: 999;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .topbar-left {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+        }
+
+        /* Far-Left Branding Logo in Topbar */
+        .topbar-brand {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          transition: transform 0.2s;
+        }
+
+        .topbar-brand:hover {
+          transform: translateY(-1px);
+        }
+
+        .brand-logo-small {
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          color: white;
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-sm);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+          font-size: 20px;
+          flex-shrink: 0;
+        }
+
+        .brand-title-meta h2 {
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--text);
+          line-height: 1.2;
+          font-family: var(--font-display);
+        }
+
+        .brand-system-tag {
+          font-size: 8px;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          display: block;
+        }
+
+        .brand-divider {
+          width: 1px;
+          height: 28px;
+          background-color: var(--border);
         }
 
         .view-title {
-          font-size: 20px;
-          font-weight: 700;
-          color: var(--text);
-          font-family: var(--font-display);
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--text-muted);
+          font-family: var(--font-sans);
         }
 
         .topbar-right {
           display: flex;
           align-items: center;
-          gap: 16px;
+          gap: 14px;
         }
 
-        .system-date {
+        /* Quick Create Dropdown Menu CSS */
+        .quick-create-wrapper {
+          position: relative;
+        }
+
+        .quick-create-trigger {
+          height: 38px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 0 16px;
+          border-radius: var(--radius-full);
+          font-weight: 600;
+          font-size: 13px;
+        }
+
+        .quick-create-dropdown {
+          position: absolute;
+          right: 0;
+          top: 48px;
+          width: 220px;
+          background-color: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          box-shadow: var(--shadow-lg);
+          padding: 8px 0;
+          z-index: 1001;
+        }
+
+        .dropdown-title {
+          font-size: 11px;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: var(--text-muted);
+          padding: 6px 16px;
+          letter-spacing: 0.5px;
+          border-bottom: 1px solid var(--border);
+          margin-bottom: 4px;
+        }
+
+        .quick-create-menu {
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .quick-create-menu button {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 16px;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-size: 13px;
+          color: var(--text);
+          font-family: var(--font-sans);
+          transition: var(--transition);
+          text-align: left;
+        }
+
+        .quick-create-menu button:hover {
+          background-color: var(--background);
+          color: var(--primary);
+        }
+
+        .quick-create-menu button span {
+          flex: 1;
+        }
+
+        .icon-blue { color: #3b82f6; }
+        .icon-green { color: #10b981; }
+        .icon-orange { color: #f59e0b; }
+        .icon-purple { color: #8b5cf6; }
+        .icon-indigo { color: #6366f1; }
+
+        /* Live Digital Clock CSS */
+        .system-date-clock {
           display: flex;
           align-items: center;
           gap: 8px;
@@ -315,22 +568,30 @@ export const Topbar: React.FC = () => {
           border: 1px solid var(--border);
           padding: 8px 14px;
           border-radius: var(--radius-sm);
-          font-size: 13px;
+          font-size: 12.5px;
           font-weight: 500;
           color: var(--text);
+          height: 38px;
+          box-sizing: border-box;
         }
 
-        .text-primary {
+        .clock-calendar-icon {
           color: var(--primary);
+        }
+
+        .ticking-time {
+          color: var(--primary);
+          font-family: monospace;
+          font-size: 13px;
         }
 
         .icon-btn {
           background: transparent;
           border: 1px solid var(--border);
           color: var(--text);
-          width: 40px;
-          height: 40px;
-          border-radius: var(--radius-sm);
+          width: 38px;
+          height: 38px;
+          border-radius: var(--radius-full);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -350,28 +611,22 @@ export const Topbar: React.FC = () => {
         }
 
         @keyframes pulseShadow {
-          0% {
-            box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4);
-          }
-          70% {
-            box-shadow: 0 0 0 10px rgba(13, 148, 136, 0);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
-          }
+          0% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4); }
+          70% { box-shadow: 0 0 0 8px rgba(13, 148, 136, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0); }
         }
 
         .notification-badge {
           background-color: var(--danger);
           color: white;
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 700;
-          width: 18px;
-          height: 18px;
+          width: 16px;
+          height: 16px;
           border-radius: var(--radius-full);
           position: absolute;
-          top: -4px;
-          right: -4px;
+          top: -3px;
+          right: -3px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -385,18 +640,18 @@ export const Topbar: React.FC = () => {
         .notification-dropdown {
           position: absolute;
           right: 0;
-          top: 50px;
+          top: 48px;
           width: 360px;
           background-color: var(--surface);
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
           box-shadow: var(--shadow-lg);
           overflow: hidden;
-          animation: slideUp 0.2s ease-out;
+          z-index: 1001;
         }
 
         .dropdown-header {
-          padding: 14px 18px;
+          padding: 12px 18px;
           border-bottom: 1px solid var(--border);
           display: flex;
           justify-content: space-between;
@@ -405,21 +660,21 @@ export const Topbar: React.FC = () => {
         }
 
         .dropdown-header h3 {
-          font-size: 14px;
+          font-size: 13.5px;
           font-weight: 600;
         }
 
         .count-badge {
           background-color: var(--primary-light);
           color: var(--primary);
-          font-size: 11px;
+          font-size: 10.5px;
           font-weight: 600;
           padding: 2px 8px;
           border-radius: var(--radius-full);
         }
 
         .dropdown-body {
-          max-height: 380px;
+          max-height: 360px;
           overflow-y: auto;
         }
 
@@ -448,7 +703,7 @@ export const Topbar: React.FC = () => {
         .notification-item {
           display: flex;
           gap: 12px;
-          padding: 14px 18px;
+          padding: 12px 18px;
           border-bottom: 1px solid var(--border);
           transition: var(--transition);
         }
@@ -498,12 +753,16 @@ export const Topbar: React.FC = () => {
         }
 
         .item-desc {
-          font-size: 12px;
+          font-size: 11.5px;
           color: var(--text-muted);
           line-height: 1.4;
         }
 
-        /* Profile Dropdown Menu Styling (Rule 4) */
+        /* Theme Toggle topbar icons */
+        .theme-icon-sun { color: var(--warning); }
+        .theme-icon-moon { color: var(--primary); }
+
+        /* Profile wrapper */
         .profile-wrapper {
           position: relative;
         }
@@ -518,7 +777,7 @@ export const Topbar: React.FC = () => {
           gap: 10px;
           cursor: pointer;
           transition: var(--transition);
-          height: 40px;
+          height: 38px;
         }
 
         .avatar-trigger-btn:hover {
@@ -536,12 +795,12 @@ export const Topbar: React.FC = () => {
           align-items: center;
           justify-content: center;
           font-weight: 700;
-          font-size: 13px;
+          font-size: 12.5px;
           border: 1.5px solid var(--primary);
         }
 
         .avatar-name {
-          font-size: 13.5px;
+          font-size: 13px;
           font-weight: 600;
           color: var(--text);
         }
@@ -549,19 +808,18 @@ export const Topbar: React.FC = () => {
         .profile-dropdown {
           position: absolute;
           right: 0;
-          top: 50px;
-          width: 200px;
+          top: 48px;
+          width: 180px;
           background-color: var(--surface);
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
           box-shadow: var(--shadow-lg);
           overflow: hidden;
-          z-index: 100;
-          animation: slideUp 0.2s ease-out;
+          z-index: 1001;
         }
 
         .dropdown-profile-header {
-          padding: 12px 16px;
+          padding: 10px 14px;
           background-color: var(--surface-header);
           border-bottom: 1px solid var(--border);
           display: flex;
@@ -569,12 +827,12 @@ export const Topbar: React.FC = () => {
         }
 
         .dropdown-profile-header strong {
-          font-size: 13px;
+          font-size: 12.5px;
           color: var(--text);
         }
 
         .role-tag {
-          font-size: 9px;
+          font-size: 8.5px;
           font-weight: 700;
           color: var(--primary);
           text-transform: uppercase;
@@ -589,11 +847,11 @@ export const Topbar: React.FC = () => {
 
         .profile-menu-item {
           width: 100%;
-          padding: 10px 16px;
+          padding: 8px 14px;
           border: none;
           background: transparent;
           text-align: left;
-          font-size: 13px;
+          font-size: 12.5px;
           color: var(--text);
           cursor: pointer;
           transition: var(--transition);
@@ -609,7 +867,7 @@ export const Topbar: React.FC = () => {
           color: var(--danger);
           border-top: 1px solid var(--border);
           margin-top: 4px;
-          padding-top: 12px;
+          padding-top: 10px;
         }
 
         .profile-menu-item.logout:hover {
@@ -624,6 +882,34 @@ export const Topbar: React.FC = () => {
           cursor: pointer;
           color: var(--text-muted);
           line-height: 1;
+        }
+
+        /* Scale up animation */
+        .scale-up {
+          animation: scaleUp 0.15s ease-out;
+        }
+
+        @keyframes scaleUp {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+
+        @media (max-width: 992px) {
+          .view-title {
+            display: none;
+          }
+          .brand-divider {
+            display: none;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .system-date-clock {
+            display: none;
+          }
+          .avatar-name {
+            display: none;
+          }
         }
       `}</style>
     </header>

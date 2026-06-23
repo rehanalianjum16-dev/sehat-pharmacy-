@@ -43,6 +43,10 @@ interface AppContextType {
   updateCustomers: (customers: Customer[]) => void;
   updateSettings: (settings: PharmacySettings) => void;
   resetDatabase: () => void;
+  viewTab: string;
+  setViewTab: (tab: string) => void;
+  activeModal: string | null;
+  setActiveModal: (modal: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -66,6 +70,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('sehat_theme') === 'dark';
   });
+
+  const [viewTab, setViewTab] = useState<string>('all');
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   // DB States
   const [settings, setSettings] = useState<PharmacySettings>(() => LocalStorageDB.getSettings());
@@ -361,7 +368,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateSuppliers,
       updateCustomers,
       updateSettings,
-      resetDatabase
+      resetDatabase,
+      viewTab,
+      setViewTab,
+      activeModal,
+      setActiveModal
     }}>
       {children}
     </AppContext.Provider>

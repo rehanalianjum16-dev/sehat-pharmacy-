@@ -1,26 +1,59 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
-  LayoutDashboard, ShoppingCart, Pill, RefreshCw, Users, FileText, BarChart3, Settings, LogOut, Moon, Sun
+  LayoutDashboard, ShoppingCart, Pill, RefreshCw, Users, 
+  FileText, BarChart3, Settings, LogOut, ShieldAlert,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
 
-interface SidebarProps {
-  className?: string;
-}
+export const Sidebar: React.FC = () => {
+  const { 
+    currentUser, currentView, setView, logout, 
+    viewTab, setViewTab, activeModal, setActiveModal 
+  } = useApp();
 
-export const Sidebar: React.FC<SidebarProps> = () => {
-  const { currentUser, currentView, setView, logout, darkMode, toggleTheme, settings } = useApp();
+  const [isHovered, setIsHovered] = useState(false);
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
+    products: false
+  });
 
   if (!currentUser) return null;
 
   // Collapse sidebar on all views except dashboard (Rule 5)
-  const isCollapsed = currentView !== 'dashboard';
+  const isDashboard = currentView === 'dashboard';
+  const isCollapsed = !isDashboard && !isHovered;
 
-  // Navigation schema based on Role-Based Access Control (RBAC)
+  // Auto-expand accordion when navigating to a view
+  useEffect(() => {
+    if (currentView === 'products') {
+      setOpenMenus(prev => ({ ...prev, products: true }));
+    }
+  }, [currentView]);
+
+  const toggleMenu = (menuId: string) => {
+    setOpenMenus(prev => ({
+      ...prev,
+      [menuId]: !prev[menuId]
+    }));
+  };
+
+  // Navigation schema based on Role-Based Access Control (RBAC) and sub-menus
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'MANAGER'] },
+    { 
+      id: 'products', 
+      label: 'Product Management', 
+      icon: Pill, 
+      roles: ['ADMIN', 'MANAGER', 'CASHIER'],
+      subItems: [
+        { id: 'all-products', label: 'All Products', active: viewTab === 'all' && !activeModal, action: () => { setView('products'); setViewTab('all'); setActiveModal(null); } },
+        { id: 'create-product', label: 'Create Product', active: activeModal === 'create-product', action: () => { setView('products'); setViewTab('all'); setActiveModal('create-product'); } },
+        { id: 'edit-product', label: 'Update/Edit Product', active: activeModal === 'edit-product-selector', action: () => { setView('products'); setViewTab('all'); setActiveModal('edit-product-selector'); } },
+        { id: 'categories', label: 'Category Management', active: viewTab === 'categories', action: () => { setView('products'); setViewTab('categories'); setActiveModal(null); } },
+      ]
+    },
     { id: 'pos', label: 'POS Billing', icon: ShoppingCart, roles: ['ADMIN', 'CASHIER'] },
-    { id: 'inventory', label: 'Inventory', icon: Pill, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
+    { id: 'inventory', label: 'Inventory & Alerts', icon: ShieldAlert, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
     { id: 'purchases', label: 'Purchases & Stock', icon: RefreshCw, roles: ['ADMIN', 'MANAGER'] },
     { id: 'people', label: 'People (Supp/Cust)', icon: Users, roles: ['ADMIN', 'MANAGER'] },
     { id: 'invoices', label: 'Invoices Log', icon: FileText, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
@@ -31,28 +64,88 @@ export const Sidebar: React.FC<SidebarProps> = () => {
   const allowedNavItems = navItems.filter(item => item.roles.includes(currentUser.role));
 
   return (
-    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-      {/* Brand Header */}
-      <div className="sidebar-brand">
-        <div className="brand-logo">
-          <span>+</span>
-        </div>
-        {!isCollapsed && (
-          <div>
-            <h2>{settings.pharmacyName}</h2>
-            <span className="system-tag">Management System</span>
-          </div>
-        )}
-      </div>
+    <aside 
+      className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Top spacing representing brand space height (Branding itself is in Topbar) */}
+      <div className="sidebar-brand-spacer" />
+
       {/* Navigation Links */}
       <nav className="sidebar-nav">
         <ul>
           {allowedNavItems.map(item => {
             const Icon = item.icon;
+            
+            if (item.subItems) {
+              const isMenuOpen = openMenus[item.id];
+              const isSubActive = currentView === item.id;
+              
+              return (
+                <li 
+                  key={item.id} 
+                  className="nav-item-has-submenu"
+                  onMouseEnter={() => {
+                    if (!isCollapsed) {
+                      setOpenMenus(prev => ({ ...prev, [item.id]: true }));
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (!isCollapsed) {
+                      setOpenMenus(prev => ({ ...prev, [item.id]: false }));
+                    }
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (currentView !== item.id) {
+                        setView(item.id);
+                        setViewTab('all');
+                        setActiveModal(null);
+                      } else {
+                        toggleMenu(item.id);
+                      }
+                    }}
+                    className={`nav-link ${isSubActive ? 'active' : ''}`}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <Icon size={18} />
+                    {!isCollapsed && (
+                      <div className="nav-link-text-row">
+                        <span>{item.label}</span>
+                        {isMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Sub-menu items sliding down */}
+                  {!isCollapsed && (
+                    <ul className={`sub-menu-list ${isMenuOpen ? 'open' : ''}`}>
+                      {item.subItems.map(sub => (
+                        <li key={sub.id}>
+                          <button
+                            type="button"
+                            onClick={sub.action}
+                            className={`sub-nav-link ${isSubActive && sub.active ? 'active' : ''}`}
+                          >
+                            <span>{sub.label}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            }
+
+            // Normal menu items
             const isActive = currentView === item.id;
             return (
               <li key={item.id}>
                 <button
+                  type="button"
                   onClick={() => setView(item.id)}
                   className={`nav-link ${isActive ? 'active' : ''}`}
                   title={isCollapsed ? item.label : undefined}
@@ -66,18 +159,20 @@ export const Sidebar: React.FC<SidebarProps> = () => {
         </ul>
       </nav>
 
-      {/* Sidebar Footer - Settings and Theme */}
+      {/* Sidebar Footer - Logout only (theme toggler moved to Topbar) */}
       <div className="sidebar-footer">
-        <button
-          className="theme-toggle-btn"
-          onClick={toggleTheme}
-          title={isCollapsed ? (darkMode ? "Switch to Light Mode" : "Switch to Dark Mode") : "Toggle Dark/Light Mode"}
-        >
-          {darkMode ? <Sun size={18} className="theme-icon" /> : <Moon size={18} className="theme-icon" />}
-          {!isCollapsed && <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>}
-        </button>
+        {/* Short info badge in sidebar */}
+        {!isCollapsed && (
+          <div className="sidebar-role-indicator">
+            <span className="user-role-lbl">{currentUser.name}</span>
+            <span className={`role-badge role-${currentUser.role.toLowerCase()}`}>
+              {currentUser.role}
+            </span>
+          </div>
+        )}
 
         <button
+          type="button"
           className="logout-btn"
           onClick={logout}
           title={isCollapsed ? "Log Out" : undefined}
@@ -94,121 +189,34 @@ export const Sidebar: React.FC<SidebarProps> = () => {
           display: flex;
           flex-direction: column;
           height: 100vh;
-          padding: 24px 16px;
-          position: sticky;
+          padding: 20px 14px;
+          position: fixed;
+          left: 0;
           top: 0;
-          z-index: 10;
+          bottom: 0;
+          z-index: 1000;
           width: 260px;
-          transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow-x: hidden;
+          overflow-y: auto;
+          box-sizing: border-box;
+          transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Collapsed Sidebar overrides (Rule 5) */
+        /* Collapsed Sidebar overrides */
         .sidebar.collapsed {
           width: 70px;
-          padding: 24px 8px;
+          padding: 20px 8px;
           align-items: center;
         }
 
-        .sidebar-brand {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 30px;
-          padding: 0 8px;
-          transition: var(--transition);
+        .sidebar:not(.collapsed) {
+          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
         }
 
-        .sidebar.collapsed .sidebar-brand {
-          justify-content: center;
-          gap: 0;
-          padding: 0;
-          margin-bottom: 24px;
-        }
-
-        .brand-logo {
-          background: linear-gradient(135deg, var(--primary), var(--secondary));
-          color: white;
-          width: 36px;
-          height: 36px;
-          border-radius: var(--radius-sm);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 800;
-          font-size: 24px;
+        .sidebar-brand-spacer {
+          height: 70px; /* aligns with topbar height */
           flex-shrink: 0;
         }
-
-        .sidebar-brand h2 {
-          font-size: 16px;
-          color: var(--text);
-          font-family: var(--font-display);
-        }
-
-        .system-tag {
-          font-size: 10px;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 1px;
-        }
-
-        .sidebar-profile {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          background-color: var(--background);
-          padding: 12px;
-          border-radius: var(--radius-sm);
-          margin-bottom: 24px;
-          border: 1px solid var(--border);
-          transition: var(--transition);
-        }
-
-        .sidebar.collapsed .sidebar-profile {
-          padding: 8px;
-          justify-content: center;
-          margin-bottom: 20px;
-          width: 100%;
-          border: none;
-          background: transparent;
-        }
-
-        .avatar {
-          background-color: var(--primary-light);
-          color: var(--primary);
-          font-weight: 700;
-          font-size: 16px;
-          width: 38px;
-          height: 38px;
-          border-radius: var(--radius-full);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 2px solid var(--primary);
-          flex-shrink: 0;
-        }
-
-        .profile-details h4 {
-          font-size: 13px;
-          color: var(--text);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 140px;
-        }
-
-        .role-badge {
-          font-size: 10px;
-          font-weight: 700;
-          padding: 2px 6px;
-          border-radius: 4px;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
-        }
-
-        .role-admin { background-color: var(--danger-light); color: var(--danger); }
-        .role-manager { background-color: var(--warning-light); color: var(--warning); }
-        .role-cashier { background-color: var(--secondary-light); color: var(--secondary); }
 
         .sidebar-nav {
           flex: 1;
@@ -219,7 +227,7 @@ export const Sidebar: React.FC<SidebarProps> = () => {
           list-style: none;
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 4px;
         }
 
         .nav-link {
@@ -263,12 +271,66 @@ export const Sidebar: React.FC<SidebarProps> = () => {
           box-shadow: var(--shadow-glow);
         }
 
-        .sidebar-footer {
-          border-top: 1px solid var(--border);
-          padding-top: 16px;
+        .nav-link-text-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex: 1;
+        }
+
+        /* Submenu sliding CSS */
+        .sub-menu-list {
+          list-style: none;
+          padding-left: 32px;
+          margin-top: 4px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 4px;
+          overflow: hidden;
+          max-height: 0;
+          opacity: 0;
+          transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sub-menu-list.open {
+          max-height: 200px;
+          opacity: 1;
+        }
+
+        .sub-nav-link {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          padding: 8px 12px;
+          border: none;
+          background: transparent;
+          color: var(--text-muted);
+          font-family: var(--font-sans);
+          font-size: 12.5px;
+          border-radius: var(--radius-sm);
+          cursor: pointer;
+          text-align: left;
+          transition: var(--transition);
+        }
+
+        .sub-nav-link:hover {
+          color: var(--primary);
+          background-color: var(--primary-light);
+          padding-left: 16px;
+        }
+
+        .sub-nav-link.active {
+          color: var(--primary);
+          font-weight: 600;
+          background-color: var(--primary-light);
+        }
+
+        .sidebar-footer {
+          border-top: 1px solid var(--border);
+          padding-top: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
           width: 100%;
         }
 
@@ -277,33 +339,38 @@ export const Sidebar: React.FC<SidebarProps> = () => {
           padding-top: 12px;
         }
 
-        .theme-toggle-btn {
-          width: 100%;
+        .sidebar-role-indicator {
           display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 14px;
-          border: 1px dashed var(--border);
+          flex-direction: column;
+          gap: 4px;
+          padding: 8px 12px;
+          background-color: var(--background);
+          border: 1px solid var(--border);
           border-radius: var(--radius-sm);
-          background: transparent;
+        }
+
+        .user-role-lbl {
+          font-size: 12px;
+          font-weight: 600;
           color: var(--text);
-          font-family: var(--font-sans);
-          font-size: 14px;
-          cursor: pointer;
-          transition: var(--transition);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .sidebar.collapsed .theme-toggle-btn {
-          justify-content: center;
-          padding: 10px;
-          border: none;
-          gap: 0;
+        .role-badge {
+          font-size: 8.5px;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 4px;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          width: fit-content;
         }
 
-        .theme-icon {
-          color: var(--primary);
-          flex-shrink: 0;
-        }
+        .role-admin { background-color: var(--danger-light); color: var(--danger); }
+        .role-manager { background-color: var(--warning-light); color: var(--warning); }
+        .role-cashier { background-color: var(--secondary-light); color: var(--secondary); }
 
         .logout-btn {
           width: 100%;
