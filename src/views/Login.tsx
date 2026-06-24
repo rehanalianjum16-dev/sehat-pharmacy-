@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { UserRole } from '../types/db';
-import { Lock, Mail, ShieldAlert, KeyRound, ArrowLeft, Eye, EyeOff, User, Info } from 'lucide-react';
+import { Lock, Mail, ShieldAlert, KeyRound, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, googleLogin, facebookLogin, setView } = useApp();

@@ -2,7 +2,7 @@ import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
-import { Login } from './views/Login';
+import { Login } from './views/Login'; // Sehat Login View
 import RegisterPage from './app/(auth)/register/page';
 import { GoogleConsentPopup } from './views/GoogleConsentPopup';
 import { Dashboard } from './views/Dashboard';
