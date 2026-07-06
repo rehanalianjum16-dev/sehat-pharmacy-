@@ -550,7 +550,7 @@ export const POS: React.FC = () => {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '450px' }}>
             <div className="modal-header">
-              <h3>Add New Customer</h3>
+              <h3>Register New Customer</h3>
               <button
                 className="btn btn-secondary btn-icon"
                 onClick={() => setShowCustomerModal(false)}
